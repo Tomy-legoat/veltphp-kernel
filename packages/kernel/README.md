@@ -692,8 +692,6 @@ l’exposition des secrets ;
 les traces complètes en production ;
 les dépendances HTTP...
 
-ksdgkisdufnks
-
 -----
 
 ## Ce que le Kernel ne fait PAS
@@ -797,3 +795,6 @@ Le Kernel est considéré comme valide si :
  - aucune dépendance vers d’autres modules Velt
  - le Kernel fonctionne en isolation totale
 ```
+
+
+SEM - KASANGA
