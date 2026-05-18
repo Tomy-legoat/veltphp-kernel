@@ -875,4 +875,4 @@ Le Kernel est considéré comme valide si :
 ```
 
 
-SEM - KASANGA
+SEM - KASANGA - KISAMU / Lundi 18 Mai 2026 / 17h15
