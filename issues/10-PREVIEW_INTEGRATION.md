@@ -1,10 +1,83 @@
-# Intégration Preview dans le Kernel VeltPHP
+# Issue 10 - Intégration Preview dans le Kernel VeltPHP
 
-## Vue d'ensemble
+## Objectif
 
-Le module Preview est maintenant intégré au kernel VeltPHP via le `PreviewServiceProvider`. Cette intégration permet d'utiliser les fonctionnalités de preview (sessions, parser AST, endpoints API) directement depuis le kernel.
+Intégrer le module Preview dans le kernel VeltPHP pour permettre l'utilisation des fonctionnalités de preview (sessions, parser AST, endpoints API) directement depuis le kernel via des contrats et services.
 
-## Architecture
+## Contexte
+
+Le module Preview est déjà développé et fonctionnel dans `velt-preview/`. Il contient :
+- Génération de sessions preview
+- Parser de fichiers `.velt` vers AST
+- API REST endpoints
+- Génération QR code
+- Intégration complète des 7 sous-modules
+
+## Tâches à accomplir
+
+### 1. Créer le contrat PreviewServiceInterface
+
+**Fichier** : `packages/kernel/src/Contracts/PreviewServiceInterface.php`
+
+```php
+<?php
+
+namespace Velt\Kernel\Contracts;
+
+interface PreviewServiceInterface
+{
+    public function createSession(string $view): array;
+    public function getPreviewData(string $sessionId): ?array;
+    public function getSession(string $sessionId): ?array;
+    public function deleteSession(string $sessionId): bool;
+}
+```
+
+### 2. Créer le PreviewServiceProvider
+
+**Fichier** : `packages/kernel/src/PreviewServiceProvider.php`
+
+Le service provider doit :
+- Étendre la classe `ServiceProvider` du kernel
+- Enregistrer les services Preview dans le container
+- Configurer les paths (templates, storage, base_url)
+- Créer les répertoires nécessaires au boot
+- Publier la configuration par défaut
+
+**Services à enregistrer** :
+- `preview.templates_path`
+- `preview.storage_path`
+- `preview.base_url`
+- `preview.parser` (VeltParser)
+- `preview.page_repository` (VeltPageRepository)
+- `preview.session_store` (PreviewSessionStore)
+- `preview.controller` (PreviewController)
+- `preview.url_generator` (PreviewUrlGenerator)
+- `preview.qr_generator` (QRGenerator)
+- `PreviewServiceInterface`
+
+### 3. Créer le PreviewService
+
+**Fichier** : `packages/kernel/src/PreviewService.php`
+
+Implémentation de `PreviewServiceInterface` qui utilise les services Preview enregistrés dans le container.
+
+### 4. Ajouter les dépendances Preview au composer.json du kernel
+
+Ajouter les modules Preview comme dépendances dans le `composer.json` du kernel :
+- velt/preview-session-store
+- velt/preview-contracts
+- velt/preview-endpoints
+- velt/preview-qr-cli
+- velt/velt-ast
+- velt/velt-parser
+- velt/velt-view
+
+### 5. Mettre à jour la documentation
+
+Créer ou mettre à jour la documentation d'intégration dans `docs/`.
+
+## Architecture cible
 
 ```
 Kernel VeltPHP
@@ -26,89 +99,17 @@ Kernel VeltPHP
     └── preview-qr-cli
 ```
 
-## Installation
+## Dépendances Preview
 
-### 1. Ajouter les dépendances
+Les modules Preview sont situés dans `../velt-preview/` avec les dépendances centralisées :
 
-Dans le `composer.json` de votre application :
+- **composer.json centralisé** dans `velt-preview/`
+- **Autoloading PSR-4** configuré pour tous les modules
+- **Un seul vendor/** partagé
 
-```json
-{
-    "repositories": [
-        {
-            "type": "path",
-            "url": "../velt-preview/preview-session-store"
-        },
-        {
-            "type": "path",
-            "url": "../velt-preview/preview-contracts"
-        },
-        {
-            "type": "path",
-            "url": "../velt-preview/preview-endpoints"
-        },
-        {
-            "type": "path",
-            "url": "../velt-preview/preview-qr-cli"
-        },
-        {
-            "type": "path",
-            "url": "../velt-preview/velt-ast"
-        },
-        {
-            "type": "path",
-            "url": "../velt-preview/velt-parser"
-        },
-        {
-            "type": "path",
-            "url": "../velt-preview/velt-view"
-        }
-    ],
-    "require": {
-        "velt/preview-session-store": "*",
-        "velt/preview-contracts": "*",
-        "velt/preview-endpoints": "*",
-        "velt/preview-qr-cli": "*",
-        "velt/velt-ast": "*",
-        "velt/velt-parser": "*",
-        "velt/velt-view": "*"
-    }
-}
-```
+## Exemple d'utilisation
 
-### 2. Enregistrer le ServiceProvider
-
-Dans le bootstrap de votre application :
-
-```php
-use Velt\Kernel\Application;
-use Velt\Kernel\PreviewServiceProvider;
-
-$app = new Application(__DIR__);
-$app->registerProvider(new PreviewServiceProvider($app));
-$app->boot();
-```
-
-### 3. Configurer les paths
-
-Créer le fichier `config/preview.php` (généré automatiquement au premier boot) :
-
-```php
-<?php
-
-use Velt\Kernel\Facades\App;
-
-return [
-    'templates_path' => App::basePath() . '/resources/views',
-    'storage_path' => App::basePath() . '/storage/preview',
-    'base_url' => env('PREVIEW_BASE_URL', 'http://127.0.0.1:8000'),
-    'session_ttl' => env('PREVIEW_SESSION_TTL', 3600),
-];
-```
-
-## Utilisation
-
-### Via le contrat PreviewServiceInterface
+Une fois l'intégration terminée, les développeurs pourront utiliser :
 
 ```php
 use Velt\Kernel\Contracts\PreviewServiceInterface;
@@ -121,91 +122,29 @@ class MyController
 
     public function createPreview()
     {
-        // Créer une session preview
         $session = $this->preview->createSession('auth.login');
-        
         return [
             'id' => $session['id'],
             'url' => $session['url'],
             'qr_payload' => $session['qrPayload']
         ];
     }
-
-    public function getPreview(string $sessionId)
-    {
-        // Récupérer les données JSON de preview
-        $data = $this->preview->getPreviewData($sessionId);
-        
-        return $data;
-    }
 }
 ```
 
-### Via le container directement
+## Documentation de référence
 
-```php
-$generator = $app->container()->get('preview.url_generator');
-$session = $generator->createForView('auth.login');
+Pour plus de détails sur le module Preview lui-même, voir :
+- `../velt-preview/PREVIEW_DOCUMENTATION.md` - Documentation complète du module Preview
+- `../velt-preview/README.md` - Vue d'ensemble du module Preview
 
-$controller = $app->container()->get('preview.controller');
-$response = $controller->preview($session['id']);
-```
+## Critères d'acceptation
 
-## Services enregistrés
-
-Le `PreviewServiceProvider` enregistre les services suivants dans le container :
-
-| Service | Description |
-|---------|-------------|
-| `preview.templates_path` | Chemin vers les templates .velt |
-| `preview.storage_path` | Chemin vers le stockage des sessions |
-| `preview.base_url` | URL de base pour les endpoints preview |
-| `preview.parser` | Instance de VeltParser |
-| `preview.page_repository` | Instance de VeltPageRepository |
-| `preview.session_store` | Instance de PreviewSessionStore |
-| `preview.controller` | Instance de PreviewController |
-| `preview.url_generator` | Instance de PreviewUrlGenerator |
-| `PreviewServiceInterface` | Service Preview du kernel |
-
-## Format des fichiers .velt
-
-Les templates Velt utilisent une syntaxe simple basée sur l'indentation :
-
-```velt
-VStack class="flex-1 p-4"
-  Text value="Se connecter" class="text-2xl font-bold mb-4"
-  Input name="email" label="Email" type="email" class="mb-4"
-  Input name="password" label="Mot de passe" type="password" class="mb-4"
-  Button text="Connexion" class="bg-blue-500 text-white"
-```
-
-## Endpoints HTTP
-
-Si vous utilisez le module HTTP du kernel, les endpoints suivants sont disponibles :
-
-- `GET /api/preview/{id}` - Récupérer le JSON de preview
-- `GET /api/session/{id}` - Récupérer les infos de session
-
-## CLI
-
-Le CLI preview est disponible via :
-
-```bash
-php bin/velt preview auth.login
-```
-
-## Tests
-
-Pour tester l'intégration :
-
-```php
-use Velt\Kernel\Contracts\PreviewServiceInterface;
-
-test('preview service creates session', function () {
-    $preview = app(PreviewServiceInterface::class);
-    $session = $preview->createSession('auth.login');
-    
-    expect($session)->toHaveKey('id');
-    expect($session)->toHaveKey('url');
-});
-```
+- [ ] PreviewServiceInterface créé avec les 4 méthodes requises
+- [ ] PreviewServiceProvider créé et étend ServiceProvider du kernel
+- [ ] Tous les services Preview enregistrés dans le container
+- [ ] PreviewService implémente correctement l'interface
+- [ ] Les dépendances Preview ajoutées au composer.json du kernel
+- [ ] La documentation d'intégration créée/mise à jour
+- [ ] Tests unitaires pour PreviewService
+- [ ] Tests d'intégration avec le container
